@@ -98,7 +98,6 @@ fun PermissionScreen(onGrant: () -> Unit) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileManagerScreen(vm: FileManagerViewModel) {
     val snackbar = remember { SnackbarHostState() }
@@ -182,7 +181,7 @@ fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, onOk: (Str
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
     )
 }
-
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FilePane(vm: FileManagerViewModel, isLeft: Boolean, state: PaneState, modifier: Modifier) {
     val isActive = vm.activeLeft == isLeft
