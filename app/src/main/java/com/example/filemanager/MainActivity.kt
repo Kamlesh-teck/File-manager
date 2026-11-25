@@ -98,6 +98,7 @@ fun PermissionScreen(onGrant: () -> Unit) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileManagerScreen(vm: FileManagerViewModel) {
     val snackbar = remember { SnackbarHostState() }
