@@ -25,6 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -55,7 +56,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() { super.onResume(); checkPermission() }
+    override fun onResume() {
+        super.onResume()
+        checkPermission()
+        if (granted) vm.refreshAll()
+    }
 
     private fun checkPermission() {
         granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
@@ -181,10 +186,12 @@ fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, onOk: (Str
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
     )
 }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FilePane(vm: FileManagerViewModel, isLeft: Boolean, state: PaneState, modifier: Modifier) {
     val isActive = vm.activeLeft == isLeft
+    val context = LocalContext.current
     Column(
         modifier
             .fillMaxHeight()
@@ -201,7 +208,16 @@ fun FilePane(vm: FileManagerViewModel, isLeft: Boolean, state: PaneState, modifi
             }
             items(state.files, key = { it.absolutePath }) { f ->
                 FileRow(f, f.absolutePath in state.selected,
-                    onClick = { vm.open(isLeft, f) },
+                    onClick = {
+                        if (f.isDirectory) vm.open(isLeft, f)
+                        else {
+                            vm.setActive(isLeft)
+                            context.startActivity(
+                                Intent(context, EditorActivity::class.java)
+                                    .putExtra("path", f.absolutePath)
+                            )
+                        }
+                    },
                     onLong = { vm.toggleSelect(isLeft, f) })
             }
         }
