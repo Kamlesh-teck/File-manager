@@ -18,5 +18,9 @@
             </intent-filter>
         </activity>
         <activity android:name=".EditorActivity" android:exported="false" />
+        <activity
+    android:name=".MediaActivity"
+    android:exported="false"
+    android:configChanges="orientation|screenSize|keyboardHidden" />
     </application>
 </manifest>
