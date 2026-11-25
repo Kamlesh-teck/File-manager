@@ -212,10 +212,7 @@ fun FilePane(vm: FileManagerViewModel, isLeft: Boolean, state: PaneState, modifi
                         if (f.isDirectory) vm.open(isLeft, f)
                         else {
                             vm.setActive(isLeft)
-                            context.startActivity(
-                                Intent(context, EditorActivity::class.java)
-                                    .putExtra("path", f.absolutePath)
-                            )
+                            openFile(context, f)
                         }
                     },
                     onLong = { vm.toggleSelect(isLeft, f) })
