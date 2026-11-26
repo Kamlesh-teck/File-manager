@@ -1,5 +1,6 @@
 package com.example.filemanager
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -15,7 +16,10 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -110,6 +114,7 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
     var dialog by remember { mutableStateOf<String?>(null) } // "rename" | "folder" | "delete"
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var showLocations by remember { mutableStateOf(false) }
 
     LaunchedEffect(vm.message) {
         vm.message?.let { snackbar.showSnackbar(it); vm.message = null }
@@ -128,6 +133,11 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
                             style = MaterialTheme.typography.titleMedium)
                         Text("Items: ${active.files.size}  Selected: $count",
                             style = MaterialTheme.typography.bodySmall)
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = { showLocations = true }) {
+                        Icon(Icons.Default.Menu, "Locations")
                     }
                 },
                 actions = {
@@ -171,6 +181,13 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
             FilePane(vm, true, vm.left, Modifier.weight(1f))
             FilePane(vm, false, vm.right, Modifier.weight(1f))
         }
+    }
+
+    if (showLocations) {
+        LocationsDialog(
+            onPick = { vm.load(vm.activeLeft, it); showLocations = false },
+            onDismiss = { showLocations = false }
+        )
     }
 
     when (dialog) {
@@ -275,4 +292,59 @@ fun humanSize(b: Long): String {
     var v = b / 1024.0; var i = 0
     while (v >= 1024 && i < u.lastIndex) { v /= 1024; i++ }
     return "%.1f %s".format(v, u[i])
+}
+
+
+// ---------- Locations (internal, SD card, /storage, root) ----------
+
+fun locationList(context: Context): List<Pair<String, File>> {
+    val out = mutableListOf<Pair<String, File>>()
+    val seen = mutableSetOf<String>()
+    fun add(name: String, f: File) {
+        val key = try { f.canonicalPath } catch (e: Exception) { f.path }
+        if (seen.add(key)) out.add(name to f)
+    }
+    context.getExternalFilesDirs(null).forEachIndexed { i, d ->
+        val p = d?.absolutePath ?: return@forEachIndexed
+        val idx = p.indexOf("/Android/data")
+        if (idx > 0) add(if (i == 0) "Internal storage" else "SD card / USB", File(p.substring(0, idx)))
+    }
+    File("/storage").listFiles()?.forEach {
+        if (it.isDirectory && it.name != "emulated" && it.name != "self")
+            add("SD card / USB (${it.name})", it)
+    }
+    add("/storage", File("/storage"))
+    add("Root (/)", File("/"))
+    return out
+}
+
+@Composable
+fun LocationsDialog(onPick: (File) -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val places = remember { locationList(context) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Locations") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                places.forEach { (name, f) ->
+                    val total = f.totalSpace
+                    ListItem(
+                        headlineContent = { Text(name) },
+                        supportingContent = {
+                            val info = if (total > 0)
+                                "${humanSize(total - f.freeSpace)} used / ${humanSize(total)}\n" else ""
+                            Text(info + f.path)
+                        },
+                        leadingContent = { Icon(Icons.Default.Storage, null) },
+                        colors = ListItemDefaults.colors(
+                            containerColor = androidx.compose.ui.graphics.Color.Transparent
+                        ),
+                        modifier = Modifier.clickable { onPick(f) }
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("Close") } }
+    )
 }
