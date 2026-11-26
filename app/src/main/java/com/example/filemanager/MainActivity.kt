@@ -64,10 +64,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkPermission()
+        Bookmarks.load(this)
         setContent {
             AppTheme {
                 if (granted) {
-                    LaunchedEffect(Unit) { vm.refreshAll() }
+                    LaunchedEffect(Unit) {
+                        val h = Bookmarks.home?.let { File(it) }
+                        if (h != null && h.isDirectory && vm.left.back.isEmpty() && vm.right.back.isEmpty()) {
+                            vm.load(true, h, false)
+                            vm.load(false, h, false)
+                        } else vm.refreshAll()
+                    }
                     FileManagerScreen(vm)
                 } else {
                     PermissionScreen { requestPermission() }
@@ -171,6 +178,8 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
         val t = active.path.totalSpace
         if (t > 0) humanSize(t - active.path.freeSpace) + "/" + humanSize(t) else "-"
     }
+    val hereDir = active.path.absolutePath
+    val bookmarked = hereDir in Bookmarks.items
     val folders = active.files.count { it.isDirectory }
     val filesCount = active.files.size - folders
 
@@ -302,6 +311,19 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
                                         )
                                         MenuRow(Icons.Default.SwapHoriz, "Swap windows") {
                                             menuOpen = false; vm.swapPanes()
+                                        }
+                                        MenuRow(
+                                            Icons.Default.Bookmark,
+                                            if (bookmarked) "Remove bookmark" else "Add bookmark"
+                                        ) {
+                                            menuOpen = false
+                                            val added = Bookmarks.toggle(context, hereDir)
+                                            vm.message = if (added) "Bookmark ban gaya" else "Bookmark hata diya"
+                                        }
+                                        MenuRow(Icons.Default.Home, "Set as Home") {
+                                            menuOpen = false
+                                            Bookmarks.setHome(context, hereDir)
+                                            vm.message = "Ab app isi folder se shuru hoga"
                                         }
                                         MenuRow(Icons.Default.Palette, "Theme / Colors") {
                                             menuOpen = false; dialog = "theme"
@@ -731,6 +753,26 @@ fun DrawerContent(onPick: (File) -> Unit, onTerminal: () -> Unit, onTheme: () ->
                 }
             }
             places.forEach { (name, f) -> StorageRow(name, f) { onPick(f) } }
+            Bookmarks.home?.let { h ->
+                DrawerItem(Icons.Default.Home, "Home: " + File(h).name.ifEmpty { h }, true) {
+                    onPick(File(h))
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            Text(
+                "Bookmarks", color = MaterialTheme.colorScheme.primary,
+                fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+            if (Bookmarks.items.isEmpty()) {
+                Text(
+                    "Koi bookmark nahi. Kisi folder me jao aur menu se Add bookmark dabao.",
+                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+            Bookmarks.items.toList().forEach { p ->
+                BookmarkRow(p, onOpen = { onPick(File(p)) }, onRemove = { Bookmarks.remove(context, p) })
+            }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
             Text(
                 "Tools", color = MaterialTheme.colorScheme.primary,
@@ -738,9 +780,28 @@ fun DrawerContent(onPick: (File) -> Unit, onTerminal: () -> Unit, onTheme: () ->
             )
             DrawerItem(Icons.Default.Terminal, "Terminal", true, onTerminal)
             DrawerItem(Icons.Default.Palette, "Theme / Colors", true, onTheme)
-            DrawerItem(Icons.Default.Bookmarks, "Bookmarks", false) {}
             DrawerItem(Icons.Default.Delete, "Recycle Bin", false) {}
             DrawerItem(Icons.Default.Apps, "Installed Apps", false) {}
+        }
+    }
+}
+
+@Composable
+fun BookmarkRow(path: String, onOpen: () -> Unit, onRemove: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Default.Bookmark, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+            Text(File(path).name.ifEmpty { path }, fontSize = 14.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+            Text(path, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = onRemove, modifier = Modifier.size(40.dp)) {
+            Icon(Icons.Default.Close, "Remove", modifier = Modifier.size(18.dp))
         }
     }
 }
