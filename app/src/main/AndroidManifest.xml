@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
     <application
         android:label="All-In-One FM"
         android:requestLegacyExternalStorage="true"
@@ -19,21 +23,23 @@
         </activity>
         <activity android:name=".EditorActivity" android:exported="false" />
         <activity
-    android:name=".MediaActivity"
-    android:exported="false"
-    android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:name=".MediaActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
-    android:name=".PdfActivity"
-    android:exported="false"
-    android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:name=".PdfActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
-    android:name=".ZipActivity"
-    android:exported="false"
-    android:configChanges="orientation|screenSize|keyboardHidden" />
-<activity
-    android:name=".TerminalActivity"
-    android:exported="false"
-    android:windowSoftInputMode="adjustResize"
-    android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:name=".ZipActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
+            android:name=".TerminalActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".ApkActivity" android:exported="false" />
+        <activity android:name=".AppsActivity" android:exported="false" />
     </application>
 </manifest>
