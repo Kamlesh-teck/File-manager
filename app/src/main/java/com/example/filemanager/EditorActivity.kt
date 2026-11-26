@@ -45,7 +45,7 @@ class EditorActivity : ComponentActivity() {
         val path = intent.getStringExtra("path")
         if (path == null) { finish(); return }
         setContent {
-            MaterialTheme {
+            AppTheme {
                 EditorScreen(File(path), onClose = { finish() })
             }
         }
@@ -120,6 +120,7 @@ fun EditorScreen(file: File, onClose: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 title = {
                     Text(file.name + if (modified) " *" else "", maxLines = 1,
                         style = MaterialTheme.typography.titleMedium)
