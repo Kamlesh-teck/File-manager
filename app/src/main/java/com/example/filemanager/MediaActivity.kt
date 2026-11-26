@@ -62,6 +62,7 @@ fun openFile(context: Context, f: File) {
     val ext = f.extension.lowercase()
     val target = when {
         ext == "pdf" -> PdfActivity::class.java
+        ext == "apk" -> ApkActivity::class.java
         ext in ZIP_EXTS -> ZipActivity::class.java
         ext in IMAGE_EXTS || ext in VIDEO_EXTS || ext in AUDIO_EXTS -> MediaActivity::class.java
         else -> EditorActivity::class.java
