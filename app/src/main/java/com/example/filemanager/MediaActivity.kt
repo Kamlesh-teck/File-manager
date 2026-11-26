@@ -78,7 +78,7 @@ class MediaActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val file = File(path)
         setContent {
-            MaterialTheme {
+            AppTheme {
                 Surface(
                     color = Color.Black,
                     contentColor = Color.White,
