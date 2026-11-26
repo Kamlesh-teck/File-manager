@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import java.io.File
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -107,6 +108,8 @@ fun PermissionScreen(onGrant: () -> Unit) {
 fun FileManagerScreen(vm: FileManagerViewModel) {
     val snackbar = remember { SnackbarHostState() }
     var dialog by remember { mutableStateOf<String?>(null) } // "rename" | "folder" | "delete"
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(vm.message) {
         vm.message?.let { snackbar.showSnackbar(it); vm.message = null }
@@ -130,6 +133,27 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
                 actions = {
                     IconButton(onClick = { vm.selectAll() }) { Icon(Icons.Default.SelectAll, "Select all") }
                     IconButton(onClick = { vm.toggleHidden() }) { Icon(Icons.Default.Visibility, "Hidden") }
+                    IconButton(
+                        onClick = {
+                            val items = active.selected.map { File(it) }
+                            val dir = active.path
+                            scope.launch {
+                                val r = zipSelectedItems(dir, items)
+                                vm.message = r.fold(
+                                    { "Zip ban gaya: ${it.name}" },
+                                    { "Zip nahi bana: ${it.message}" }
+                                )
+                                vm.refreshAll()
+                            }
+                        },
+                        enabled = count > 0
+                    ) { Icon(Icons.Default.Archive, "Zip") }
+                    IconButton(onClick = {
+                        context.startActivity(
+                            Intent(context, TerminalActivity::class.java)
+                                .putExtra("path", active.path.absolutePath)
+                        )
+                    }) { Icon(Icons.Default.Terminal, "Terminal") }
                 }
             )
         },
