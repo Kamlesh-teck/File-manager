@@ -44,12 +44,15 @@ class FileManagerViewModel : ViewModel() {
 
     fun load(isLeft: Boolean, dir: File) = viewModelScope.launch {
         val cur = if (isLeft) left else right
-        val list = withContext(Dispatchers.IO) {
+        val raw = withContext(Dispatchers.IO) {
             dir.listFiles()
-                ?.filter { cur.showHidden || !it.name.startsWith(".") }
-                ?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
-                ?: emptyList()
+                // /storage/emulated list nahi hota, isliye uske andar "0" khud dikhate hain
+                ?: if (dir.path == "/storage/emulated") arrayOf(File("/storage/emulated/0")) else null
         }
+        if (raw == null) message = "Is folder ka content padh nahi sakte (upar ja sakte ho)"
+        val list = (raw?.toList() ?: emptyList())
+            .filter { cur.showHidden || !it.name.startsWith(".") }
+            .sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
         update(isLeft, cur.copy(path = dir, files = list, selected = emptySet()))
     }
 
@@ -61,7 +64,7 @@ class FileManagerViewModel : ViewModel() {
 
     fun goUp(isLeft: Boolean) {
         val cur = if (isLeft) left else right
-        cur.path.parentFile?.takeIf { it.canRead() }?.let { load(isLeft, it) }
+        cur.path.parentFile?.let { load(isLeft, it) }
     }
 
     fun toggleSelect(isLeft: Boolean, f: File) {
