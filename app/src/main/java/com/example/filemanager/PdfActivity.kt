@@ -42,7 +42,7 @@ class PdfActivity : ComponentActivity() {
         val path = intent.getStringExtra("path")
         if (path == null) { finish(); return }
         setContent {
-            MaterialTheme { PdfScreen(File(path)) { finish() } }
+            AppTheme { PdfScreen(File(path)) { finish() } }
         }
     }
 }
@@ -105,6 +105,7 @@ fun PdfScreen(file: File, onClose: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 title = {
                     Column {
                         Text(file.name, maxLines = 1, style = MaterialTheme.typography.titleMedium)
