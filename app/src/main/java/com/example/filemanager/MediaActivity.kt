@@ -60,8 +60,11 @@ val AUDIO_EXTS = setOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "opus", "amr")
 /** File ke type ke hisab se sahi screen kholta hai */
 fun openFile(context: Context, f: File) {
     val ext = f.extension.lowercase()
-    val target = if (ext in IMAGE_EXTS || ext in VIDEO_EXTS || ext in AUDIO_EXTS)
-        MediaActivity::class.java else EditorActivity::class.java
+    val target = when {
+        ext == "pdf" -> PdfActivity::class.java
+        ext in IMAGE_EXTS || ext in VIDEO_EXTS || ext in AUDIO_EXTS -> MediaActivity::class.java
+        else -> EditorActivity::class.java
+    }
     context.startActivity(Intent(context, target).putExtra("path", f.absolutePath))
 }
 
