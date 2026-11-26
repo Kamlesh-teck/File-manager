@@ -144,7 +144,7 @@ class ZipActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val path = intent.getStringExtra("path")
         if (path == null) { finish(); return }
-        setContent { MaterialTheme { ZipScreen(File(path)) { finish() } } }
+        setContent { AppTheme { ZipScreen(File(path)) { finish() } } }
     }
 }
 
@@ -234,6 +234,7 @@ fun ZipScreen(file: File, onClose: () -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 title = {
                     Column {
                         Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
