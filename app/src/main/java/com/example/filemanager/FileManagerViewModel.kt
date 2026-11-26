@@ -13,6 +13,41 @@ import java.io.File
 
 enum class SortBy { NAME, SIZE, DATE, TYPE }
 
+enum class FileFilter(val label: String) {
+    ALL("All"), FOLDERS("Folders only"), IMAGES("Images"), VIDEOS("Videos"), AUDIO("Audio"),
+    DOCS("Documents"), ARCHIVES("Archives"), APK("APK"), CODE("Code / Text")
+}
+
+private val F_IMAGES = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic")
+private val F_VIDEOS = setOf("mp4", "mkv", "3gp", "webm", "avi", "mov", "m4v")
+private val F_AUDIO = setOf("mp3", "m4a", "wav", "ogg", "flac", "aac", "opus", "amr")
+private val F_DOCS = setOf(
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "rtf", "txt", "csv", "epub"
+)
+private val F_ARCHIVES = setOf("zip", "rar", "7z", "tar", "gz", "jar", "xz", "bz2")
+private val F_CODE = setOf(
+    "kt", "kts", "java", "js", "ts", "py", "c", "cpp", "h", "cs", "go", "rs", "xml", "json",
+    "html", "htm", "css", "sh", "gradle", "yml", "yaml", "md", "log", "ini", "conf", "properties"
+)
+
+/** Folder hamesha dikhte hain (taaki andar ja sako), sirf "Folders only" me files chhupti hain */
+fun matchesFilter(f: File, flt: FileFilter): Boolean {
+    if (flt == FileFilter.ALL) return true
+    if (flt == FileFilter.FOLDERS) return f.isDirectory
+    if (f.isDirectory) return true
+    val e = f.extension.lowercase()
+    return when (flt) {
+        FileFilter.IMAGES -> e in F_IMAGES
+        FileFilter.VIDEOS -> e in F_VIDEOS
+        FileFilter.AUDIO -> e in F_AUDIO
+        FileFilter.DOCS -> e in F_DOCS
+        FileFilter.ARCHIVES -> e in F_ARCHIVES
+        FileFilter.APK -> e == "apk"
+        FileFilter.CODE -> e in F_CODE
+        else -> true
+    }
+}
+
 data class PaneState(
     val path: File,
     val files: List<File> = emptyList(),   // screen par dikhne wali (filter + sort ke baad)
@@ -22,6 +57,7 @@ data class PaneState(
     val sortBy: SortBy = SortBy.NAME,
     val ascending: Boolean = true,
     val query: String = "",
+    val filter: FileFilter = FileFilter.ALL,
     val back: List<File> = emptyList(),
     val forward: List<File> = emptyList()
 )
@@ -56,6 +92,7 @@ class FileManagerViewModel : ViewModel() {
         val ordered = if (s.ascending) cmp else cmp.reversed()
         return s.all
             .filter { (s.showHidden || !it.name.startsWith(".")) && (q.isEmpty() || it.name.lowercase().contains(q)) }
+            .filter { matchesFilter(it, s.filter) }
             .sortedWith(compareBy<File> { !it.isDirectory }.then(ordered))
     }
 
@@ -132,6 +169,7 @@ class FileManagerViewModel : ViewModel() {
 
     fun toggleHidden() = refilter(activeLeft) { it.copy(showHidden = !it.showHidden) }
     fun setSort(by: SortBy, asc: Boolean) = refilter(activeLeft) { it.copy(sortBy = by, ascending = asc) }
+    fun setFilter(f: FileFilter) = refilter(activeLeft) { it.copy(filter = f) }
     fun setQuery(q: String) = refilter(activeLeft) { it.copy(query = q) }
 
     fun swapPanes() {
