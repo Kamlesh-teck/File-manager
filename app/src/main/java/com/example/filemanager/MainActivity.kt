@@ -270,7 +270,7 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        "Folders: $folders  Files: $filesCount  Disk: $diskInfo",
+                                        "Folders: $folders  Files: $filesCount  Disk: $diskInfo" + (if (active.filter != FileFilter.ALL) "  [${active.filter.label}]" else ""),
                                         fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                                     )
                                 }
@@ -297,6 +297,12 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
                                         }
                                         MenuRow(Icons.AutoMirrored.Filled.Sort, "Sort") {
                                             menuOpen = false; dialog = "sort"
+                                        }
+                                        MenuRow(
+                                            Icons.Default.FilterList,
+                                            if (active.filter == FileFilter.ALL) "Filter" else "Filter: ${active.filter.label}"
+                                        ) {
+                                            menuOpen = false; dialog = "filter"
                                         }
                                         MenuRow(Icons.Default.Terminal, "Open terminal") {
                                             menuOpen = false; openTerminal()
@@ -427,6 +433,7 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
         "sort" -> SortDialog(active.sortBy, active.ascending, { by, asc -> vm.setSort(by, asc) }) {
             dialog = null
         }
+        "filter" -> FilterDialog(active.filter, { vm.setFilter(it); dialog = null }) { dialog = null }
         "theme" -> ThemeDialog { dialog = null }
         "props" -> single?.let { PropertiesDialog(it) { dialog = null } }
     }
@@ -629,6 +636,28 @@ fun SortDialog(
             }
         },
         confirmButton = { TextButton(onDismiss) { Text("OK") } }
+    )
+}
+
+@Composable
+fun FilterDialog(current: FileFilter, onPick: (FileFilter) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Filter") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                FileFilter.values().forEach { f ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(f) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = current == f, onClick = { onPick(f) })
+                        Text(f.label)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onDismiss) { Text("Close") } }
     )
 }
 
