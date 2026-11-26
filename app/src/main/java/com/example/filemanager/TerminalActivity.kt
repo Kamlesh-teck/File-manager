@@ -34,7 +34,7 @@ class TerminalActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val start = intent.getStringExtra("path")
             ?: Environment.getExternalStorageDirectory().absolutePath
-        setContent { MaterialTheme { TerminalScreen(File(start)) { finish() } } }
+        setContent { AppTheme { TerminalScreen(File(start)) { finish() } } }
     }
 }
 
@@ -130,6 +130,7 @@ fun TerminalScreen(start: File, onClose: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = appBarColors(),
                 title = { Text("Terminal", style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
