@@ -781,7 +781,9 @@ fun DrawerContent(onPick: (File) -> Unit, onTerminal: () -> Unit, onTheme: () ->
             DrawerItem(Icons.Default.Terminal, "Terminal", true, onTerminal)
             DrawerItem(Icons.Default.Palette, "Theme / Colors", true, onTheme)
             DrawerItem(Icons.Default.Delete, "Recycle Bin", false) {}
-            DrawerItem(Icons.Default.Apps, "Installed Apps", false) {}
+            DrawerItem(Icons.Default.Apps, "Installed Apps", true) {
+                context.startActivity(Intent(context, AppsActivity::class.java))
+            }
         }
     }
 }
