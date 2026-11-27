@@ -94,7 +94,10 @@ class MainActivity : ComponentActivity() {
                 appliedPrefs = Prefs.version
                 vm.applyPrefs()
             }
-            vm.refreshAll()
+            // Search se "Show in folder" aaya ho to wahi folder kholo
+            val req = ShowRequest.dir
+            ShowRequest.dir = null
+            if (req != null) vm.load(vm.activeLeft, req) else vm.refreshAll()
         }
     }
 
@@ -299,7 +302,11 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
                                             menuOpen = false; vm.refreshAll()
                                         }
                                         MenuRow(Icons.Default.Search, "Search") {
-                                            menuOpen = false; searching = true
+                                            menuOpen = false
+                                            context.startActivity(
+                                                Intent(context, SearchActivity::class.java)
+                                                    .putExtra("path", active.path.absolutePath)
+                                            )
                                         }
                                         MenuRow(Icons.Default.SelectAll, "Select all") {
                                             menuOpen = false; vm.selectAll()
