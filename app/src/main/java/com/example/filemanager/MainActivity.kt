@@ -426,8 +426,15 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
         "delete" -> AlertDialog(
             onDismissRequest = { dialog = null },
             title = { Text("Delete karein?") },
-            text = { Text("$count item hamesha ke liye delete honge.") },
-            confirmButton = { TextButton({ vm.deleteSelected(); dialog = null }) { Text("Delete") } },
+            text = {
+                Column {
+                    Text("$count item Recycle Bin me bhejein? Wahan se wapas la sakte ho.")
+                    TextButton(onClick = { vm.deleteSelected(); dialog = null }) {
+                        Text("Hamesha ke liye delete karo", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = { TextButton({ vm.trashSelected(); dialog = null }) { Text("Recycle Bin") } },
             dismissButton = { TextButton({ dialog = null }) { Text("Cancel") } }
         )
         "sort" -> SortDialog(active.sortBy, active.ascending, { by, asc -> vm.setSort(by, asc) }) {
@@ -809,7 +816,9 @@ fun DrawerContent(onPick: (File) -> Unit, onTerminal: () -> Unit, onTheme: () ->
             )
             DrawerItem(Icons.Default.Terminal, "Terminal", true, onTerminal)
             DrawerItem(Icons.Default.Palette, "Theme / Colors", true, onTheme)
-            DrawerItem(Icons.Default.Delete, "Recycle Bin", false) {}
+            DrawerItem(Icons.Default.Delete, "Recycle Bin", true) {
+                context.startActivity(Intent(context, RecycleBinActivity::class.java))
+            }
             DrawerItem(Icons.Default.Apps, "Installed Apps", true) {
                 context.startActivity(Intent(context, AppsActivity::class.java))
             }
