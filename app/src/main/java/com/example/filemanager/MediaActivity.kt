@@ -75,8 +75,9 @@ class MediaActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val path = intent.getStringExtra("path")
         if (path == null) { finish(); return }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val file = File(path)
+        if (file.extension.lowercase() in VIDEO_EXTS)
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContent {
             AppTheme {
                 Surface(
@@ -87,7 +88,7 @@ class MediaActivity : ComponentActivity() {
                     when (file.extension.lowercase()) {
                         in IMAGE_EXTS -> ImageViewer(file) { finish() }
                         in VIDEO_EXTS -> VideoPlayer(file)
-                        else -> AudioPlayer(file)
+                        else -> MusicPlayerScreen(file) { finish() }
                     }
                 }
             }
@@ -243,108 +244,6 @@ fun VideoPlayer(file: File) {
         },
         onRelease = { (it.tag as? VideoView)?.stopPlayback() }
     )
-}
-
-// ---------------- AUDIO ----------------
-
-@Composable
-fun AudioPlayer(file: File) {
-    val player = remember { MediaPlayer() }
-    var ready by remember { mutableStateOf(false) }
-    var playing by remember { mutableStateOf(false) }
-    var pos by remember { mutableIntStateOf(0) }
-    var dur by remember { mutableIntStateOf(0) }
-    var dragging by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(file) {
-        try {
-            player.setDataSource(file.absolutePath)
-            player.setOnPreparedListener {
-                dur = it.duration; ready = true; it.start(); playing = true
-            }
-            player.setOnCompletionListener { playing = false; pos = dur }
-            player.setOnErrorListener { _, _, _ ->
-                error = "Ye audio chal nahi payi"; true
-            }
-            player.prepareAsync()
-        } catch (e: Exception) {
-            error = "Ye audio chal nahi payi"
-        }
-        onDispose { try { player.release() } catch (_: Exception) {} }
-    }
-
-    LaunchedEffect(playing, dragging) {
-        while (playing && !dragging) {
-            pos = try { player.currentPosition } catch (e: Exception) { pos }
-            delay(250)
-        }
-    }
-
-    fun seekBy(ms: Int) {
-        if (!ready) return
-        val t = (player.currentPosition + ms).coerceIn(0, dur)
-        player.seekTo(t); pos = t
-    }
-
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(Icons.Default.MusicNote, null, tint = Color.White, modifier = Modifier.size(96.dp))
-        Spacer(Modifier.height(16.dp))
-        Text(file.name, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(24.dp))
-
-        if (error != null) {
-            Text(error ?: "", color = Color.White)
-        } else {
-            Slider(
-                value = pos.toFloat(),
-                onValueChange = { pos = it.toInt(); dragging = true },
-                onValueChangeFinished = {
-                    if (ready) player.seekTo(pos)
-                    dragging = false
-                },
-                valueRange = 0f..maxOf(dur, 1).toFloat()
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(fmtTime(pos), color = Color.White)
-                Text(fmtTime(dur), color = Color.White)
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { seekBy(-10_000) }) {
-                    Icon(Icons.Default.Replay10, "-10s", tint = Color.White,
-                        modifier = Modifier.size(40.dp))
-                }
-                Spacer(Modifier.width(16.dp))
-                FilledIconButton(
-                    onClick = {
-                        if (!ready) return@FilledIconButton
-                        if (playing) { player.pause(); playing = false }
-                        else {
-                            if (pos >= dur - 300) { player.seekTo(0); pos = 0 }
-                            player.start(); playing = true
-                        }
-                    },
-                    modifier = Modifier.size(72.dp)
-                ) {
-                    Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        "Play/Pause", modifier = Modifier.size(40.dp)
-                    )
-                }
-                Spacer(Modifier.width(16.dp))
-                IconButton(onClick = { seekBy(10_000) }) {
-                    Icon(Icons.Default.Forward10, "+10s", tint = Color.White,
-                        modifier = Modifier.size(40.dp))
-                }
-            }
-        }
-    }
 }
 
 fun fmtTime(ms: Int): String {
