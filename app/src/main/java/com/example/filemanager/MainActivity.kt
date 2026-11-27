@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkPermission()
+        Prefs.load(this)
         Bookmarks.load(this)
         setContent {
             AppTheme {
@@ -83,10 +84,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var appliedPrefs = 0
+
     override fun onResume() {
         super.onResume()
         checkPermission()
-        if (granted) vm.refreshAll()
+        if (granted) {
+            if (Prefs.version != appliedPrefs) {
+                appliedPrefs = Prefs.version
+                vm.applyPrefs()
+            }
+            vm.refreshAll()
+        }
     }
 
     private fun checkPermission() {
@@ -334,6 +343,10 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
                                         MenuRow(Icons.Default.Palette, "Theme / Colors") {
                                             menuOpen = false; dialog = "theme"
                                         }
+                                        MenuRow(Icons.Default.Settings, "Preferences") {
+                                            menuOpen = false
+                                            context.startActivity(Intent(context, PreferencesActivity::class.java))
+                                        }
                                         MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Exit") {
                                             menuOpen = false; (context as? Activity)?.finish()
                                         }
@@ -493,7 +506,7 @@ fun FilePane(
                         .padding(horizontal = 6.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FileIcon(File("/"), 28.dp)
+                    FileIcon(File("/"), (28f * Prefs.scale).dp)
                     Spacer(Modifier.width(6.dp))
                     Text("..", fontSize = 13.sp)
                 }
@@ -524,6 +537,7 @@ fun FileRow(f: File, selected: Boolean, onClick: () -> Unit, onLong: () -> Unit)
     val fmt = remember { SimpleDateFormat("yy-MM-dd HH:mm", Locale.getDefault()) }
     val bg = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     val info = fmt.format(Date(f.lastModified())) + if (f.isFile) "  " + humanSize(f.length()) else ""
+    val scale = Prefs.scale
     Row(
         Modifier
             .fillMaxWidth()
@@ -532,17 +546,19 @@ fun FileRow(f: File, selected: Boolean, onClick: () -> Unit, onLong: () -> Unit)
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FileIcon(f, 28.dp)
+        FileIcon(f, (28f * scale).dp)
         Spacer(Modifier.width(6.dp))
         Column {
             Text(
-                f.name, fontSize = 12.5.sp, lineHeight = 15.sp,
+                f.name, fontSize = (12.5f * scale).sp, lineHeight = (15f * scale).sp,
                 maxLines = 2, overflow = TextOverflow.Ellipsis
             )
-            Text(
-                info, fontSize = 10.sp, lineHeight = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
-            )
+            if (Prefs.showDetails) {
+                Text(
+                    info, fontSize = (10f * scale).sp, lineHeight = (12f * scale).sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
+                )
+            }
         }
     }
 }
