@@ -43,5 +43,6 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".ApkActivity" android:exported="false" />
         <activity android:name=".AppsActivity" android:exported="false" />
+        <activity android:name=".RecycleBinActivity" android:exported="false" />
     </application>
 </manifest>
