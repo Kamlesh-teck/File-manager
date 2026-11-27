@@ -200,6 +200,14 @@ class FileManagerViewModel : ViewModel() {
         refreshAll()
     }
 
+    /** Recycle Bin me bhejta hai (wapas laa sakte ho) */
+    fun trashSelected() = viewModelScope.launch {
+        val items = selectedFiles()
+        val failed = withContext(Dispatchers.IO) { items.count { moveToTrash(it).isFailure } }
+        message = if (failed == 0) "${items.size} item Recycle Bin me gaye" else "$failed item nahi hate"
+        refreshAll()
+    }
+
     fun deleteSelected() = viewModelScope.launch {
         val items = selectedFiles()
         withContext(Dispatchers.IO) { items.forEach { it.deleteRecursively() } }
