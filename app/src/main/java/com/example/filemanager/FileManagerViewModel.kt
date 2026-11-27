@@ -65,9 +65,16 @@ data class PaneState(
 class FileManagerViewModel : ViewModel() {
     private val root: File = Environment.getExternalStorageDirectory()
 
-    var left by mutableStateOf(PaneState(root))
+    private fun initialPane() = PaneState(
+        root,
+        showHidden = Prefs.showHidden,
+        sortBy = SortBy.values().getOrElse(Prefs.sortBy) { SortBy.NAME },
+        ascending = Prefs.ascending
+    )
+
+    var left by mutableStateOf(initialPane())
         private set
-    var right by mutableStateOf(PaneState(root))
+    var right by mutableStateOf(initialPane())
         private set
     var activeLeft by mutableStateOf(true)
         private set
@@ -93,7 +100,7 @@ class FileManagerViewModel : ViewModel() {
         return s.all
             .filter { (s.showHidden || !it.name.startsWith(".")) && (q.isEmpty() || it.name.lowercase().contains(q)) }
             .filter { matchesFilter(it, s.filter) }
-            .sortedWith(compareBy<File> { !it.isDirectory }.then(ordered))
+            .sortedWith(if (Prefs.foldersFirst) compareBy<File> { !it.isDirectory }.then(ordered) else ordered)
     }
 
     private fun refilter(isLeft: Boolean, change: (PaneState) -> PaneState) {
@@ -169,6 +176,16 @@ class FileManagerViewModel : ViewModel() {
 
     fun toggleHidden() = refilter(activeLeft) { it.copy(showHidden = !it.showHidden) }
     fun setSort(by: SortBy, asc: Boolean) = refilter(activeLeft) { it.copy(sortBy = by, ascending = asc) }
+    /** Preferences me badli hui settings dono panes par lagata hai */
+    fun applyPrefs() {
+        val by = SortBy.values().getOrElse(Prefs.sortBy) { SortBy.NAME }
+        for (isLeft in listOf(true, false)) {
+            refilter(isLeft) {
+                it.copy(sortBy = by, ascending = Prefs.ascending, showHidden = Prefs.showHidden)
+            }
+        }
+    }
+
     fun setFilter(f: FileFilter) = refilter(activeLeft) { it.copy(filter = f) }
     fun setQuery(q: String) = refilter(activeLeft) { it.copy(query = q) }
 
