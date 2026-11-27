@@ -53,5 +53,6 @@
             android:name=".MusicService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <activity android:name=".PreferencesActivity" android:exported="false" />
     </application>
 </manifest>
