@@ -15,6 +15,12 @@ object Prefs {
     var showDetails by mutableStateOf(true)     // rows me date aur size
     var textSize by mutableIntStateOf(1)        // 0 chhota, 1 normal, 2 bada
 
+    // Editor ki settings
+    var editorSize by mutableIntStateOf(14)     // font size (sp)
+    var editorWrap by mutableStateOf(false)     // lambi lines tod kar dikhao
+    var editorLineNumbers by mutableStateOf(true)
+    var editorHighlight by mutableStateOf(true) // code ke rang
+
     /** Har badlav par badhta hai, taaki main screen ko pata chale ki settings badli hain */
     var version by mutableIntStateOf(0)
 
@@ -38,6 +44,10 @@ object Prefs {
         foldersFirst = s.getBoolean("foldersFirst", true)
         showDetails = s.getBoolean("showDetails", true)
         textSize = s.getInt("textSize", 1).coerceIn(0, 2)
+        editorSize = s.getInt("editorSize", 14).coerceIn(8, 32)
+        editorWrap = s.getBoolean("editorWrap", false)
+        editorLineNumbers = s.getBoolean("editorLineNumbers", true)
+        editorHighlight = s.getBoolean("editorHighlight", true)
         loaded = true
     }
 
@@ -49,6 +59,10 @@ object Prefs {
             .putBoolean("foldersFirst", foldersFirst)
             .putBoolean("showDetails", showDetails)
             .putInt("textSize", textSize)
+            .putInt("editorSize", editorSize)
+            .putBoolean("editorWrap", editorWrap)
+            .putBoolean("editorLineNumbers", editorLineNumbers)
+            .putBoolean("editorHighlight", editorHighlight)
             .apply()
     }
 
@@ -59,6 +73,10 @@ object Prefs {
         foldersFirst = true
         showDetails = true
         textSize = 1
+        editorSize = 14
+        editorWrap = false
+        editorLineNumbers = true
+        editorHighlight = true
         save(c)
         version++
     }
