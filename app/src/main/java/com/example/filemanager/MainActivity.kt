@@ -192,7 +192,7 @@ fun FileManagerScreen(vm: FileManagerViewModel) {
     }
     val hereDir = active.path.absolutePath
     val bookmarked = hereDir in Bookmarks.items
-    val folders = active.files.count { it.isDirectory }
+    val folders = remember(active.files) { active.files.count { it.isDir } }
     val filesCount = active.files.size - folders
 
     fun openTerminal() {
@@ -505,6 +505,7 @@ fun FilePane(
                 else Modifier
             )
     ) {
+        if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         LazyColumn(Modifier.weight(1f)) {
             item(key = "..") {
                 Row(
@@ -513,23 +514,23 @@ fun FilePane(
                         .padding(horizontal = 6.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    FileIcon(File("/"), (28f * Prefs.scale).dp)
+                    FileIcon(File("/"), (28f * Prefs.scale).dp, true)
                     Spacer(Modifier.width(6.dp))
                     Text("..", fontSize = 13.sp)
                 }
             }
-            items(state.files, key = { it.absolutePath }) { f ->
+            items(state.files, key = { it.path }) { f ->
                 FileRow(
                     f = f,
-                    selected = f.absolutePath in state.selected,
+                    selected = f.path in state.selected,
                     onClick = {
                         vm.setActive(isLeft)
-                        if (state.selected.isNotEmpty()) vm.toggleSelect(isLeft, f)
-                        else if (f.isDirectory) vm.open(isLeft, f)
-                        else openFile(context, f)
+                        if (state.selected.isNotEmpty()) vm.toggleSelect(isLeft, f.file)
+                        else if (f.isDir) vm.open(isLeft, f.file)
+                        else openFile(context, f.file)
                     },
                     onLong = {
-                        if (f.absolutePath !in state.selected) vm.toggleSelect(isLeft, f)
+                        if (f.path !in state.selected) vm.toggleSelect(isLeft, f.file)
                         onActions()
                     }
                 )
@@ -538,12 +539,17 @@ fun FilePane(
     }
 }
 
+/** Saari rows ke liye ek hi formatter (har row me naya banana dheema hota hai) */
+private val rowDateFmt = SimpleDateFormat("yy-MM-dd HH:mm", Locale.getDefault())
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FileRow(f: File, selected: Boolean, onClick: () -> Unit, onLong: () -> Unit) {
-    val fmt = remember { SimpleDateFormat("yy-MM-dd HH:mm", Locale.getDefault()) }
+fun FileRow(f: FileItem, selected: Boolean, onClick: () -> Unit, onLong: () -> Unit) {
     val bg = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-    val info = fmt.format(Date(f.lastModified())) + if (f.isFile) "  " + humanSize(f.length()) else ""
+    // date/size ki line ek baar banti hai (storage nahi chhoti), har recomposition me nahi
+    val info = remember(f) {
+        rowDateFmt.format(Date(f.modified)) + if (!f.isDir) "  " + humanSize(f.size) else ""
+    }
     val scale = Prefs.scale
     Row(
         Modifier
@@ -553,7 +559,7 @@ fun FileRow(f: File, selected: Boolean, onClick: () -> Unit, onLong: () -> Unit)
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        FileIcon(f, (28f * scale).dp)
+        FileIcon(f.file, (28f * scale).dp, f.isDir)
         Spacer(Modifier.width(6.dp))
         Column {
             Text(
