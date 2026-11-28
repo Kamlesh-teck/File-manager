@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,9 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -42,6 +45,7 @@ import java.io.File
 class EditorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Prefs.load(this)
         val path = intent.getStringExtra("path")
         if (path == null) { finish(); return }
         setContent {
@@ -68,7 +72,10 @@ fun EditorScreen(file: File, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     val vScroll = rememberScrollState()
     val hScroll = rememberScrollState()
-    val lineHeightPx = with(LocalDensity.current) { 20.sp.toPx() }
+    val context = LocalContext.current
+    val lineHeightPx = with(LocalDensity.current) { (Prefs.editorSize * 1.45f).sp.toPx() }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
     val modified = loaded && tfv.text != original
 
     LaunchedEffect(file) {
@@ -109,7 +116,10 @@ fun EditorScreen(file: File, onClose: () -> Unit) {
         }
         tfv = tfv.copy(selection = TextRange(i, i + query.length))
         val line = t.substring(0, i).count { it == '\n' }
-        scope.launch { vScroll.animateScrollTo(maxOf(0, (line * lineHeightPx - 200f).toInt())) }
+        val y: Float = layout?.let { l ->
+            l.getLineTop(l.getLineForOffset(minOf(i, l.layoutInput.text.length)))
+        } ?: (line * lineHeightPx)
+        scope.launch { vScroll.animateScrollTo(maxOf(0, (y - 200f).toInt())) }
     }
 
     fun requestClose() { if (modified) confirmExit = true else onClose() }
@@ -136,6 +146,42 @@ fun EditorScreen(file: File, onClose: () -> Unit) {
                     }
                     IconButton(onClick = { save() }, enabled = modified) {
                         Icon(Icons.Default.Save, "Save")
+                    }
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, "Menu")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Word wrap") },
+                                trailingIcon = { Checkbox(checked = Prefs.editorWrap, onCheckedChange = null) },
+                                onClick = { Prefs.editorWrap = !Prefs.editorWrap; Prefs.save(context) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Line numbers") },
+                                trailingIcon = { Checkbox(checked = Prefs.editorLineNumbers, onCheckedChange = null) },
+                                onClick = { Prefs.editorLineNumbers = !Prefs.editorLineNumbers; Prefs.save(context) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Syntax colors") },
+                                trailingIcon = { Checkbox(checked = Prefs.editorHighlight, onCheckedChange = null) },
+                                onClick = { Prefs.editorHighlight = !Prefs.editorHighlight; Prefs.save(context) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Text bada (+)   ${Prefs.editorSize} sp") },
+                                onClick = {
+                                    Prefs.editorSize = (Prefs.editorSize + 2).coerceAtMost(32)
+                                    Prefs.save(context)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Text chhota (-)") },
+                                onClick = {
+                                    Prefs.editorSize = (Prefs.editorSize - 2).coerceAtLeast(8)
+                                    Prefs.save(context)
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -175,36 +221,61 @@ fun EditorScreen(file: File, onClose: () -> Unit) {
                 }
 
                 val ext = file.extension.lowercase()
-                val transform = remember(ext) { SyntaxTransformation(ext) }
-                val numbers = remember(tfv.text) {
-                    (1..(tfv.text.count { it == '\n' } + 1)).joinToString("\n")
+                val transform = remember(ext, Prefs.editorHighlight) {
+                    if (Prefs.editorHighlight) SyntaxTransformation(ext) else VisualTransformation.None
                 }
+                val wrap = Prefs.editorWrap
+                val showNumbers = Prefs.editorLineNumbers && !wrap
+                val numbers = remember(tfv.text, showNumbers) {
+                    if (showNumbers) (1..(tfv.text.count { it == '\n' } + 1)).joinToString("\n") else ""
+                }
+                val size = Prefs.editorSize
                 val style = TextStyle(
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
+                    fontSize = size.sp,
+                    lineHeight = (size * 1.45f).sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Row(Modifier.fillMaxSize().verticalScroll(vScroll)) {
-                    Text(
-                        numbers,
-                        style = style.copy(color = Color.Gray, textAlign = TextAlign.End),
-                        modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = 6.dp)
-                    )
-                    Box(Modifier.horizontalScroll(hScroll)) {
+                    if (showNumbers) {
+                        Text(
+                            numbers,
+                            style = style.copy(color = Color.Gray, textAlign = TextAlign.End),
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(horizontal = 6.dp)
+                        )
+                    }
+                    if (wrap) {
+                        // wrap: field ki chaudai screen tak seemit, isliye lambi line neeche tut jati hai
                         BasicTextField(
                             value = tfv,
                             onValueChange = { tfv = it },
                             textStyle = style,
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             visualTransformation = transform,
+                            onTextLayout = { layout = it },
                             modifier = Modifier
-                                .defaultMinSize(minWidth = 300.dp, minHeight = 400.dp)
-                                .padding(start = 8.dp, end = 48.dp)
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 400.dp)
+                                .padding(horizontal = 8.dp)
                         )
+                    } else {
+                        // no wrap: side me scroll
+                        Box(Modifier.horizontalScroll(hScroll)) {
+                            BasicTextField(
+                                value = tfv,
+                                onValueChange = { tfv = it },
+                                textStyle = style,
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                visualTransformation = transform,
+                                onTextLayout = { layout = it },
+                                modifier = Modifier
+                                    .defaultMinSize(minWidth = 300.dp, minHeight = 400.dp)
+                                    .padding(start = 8.dp, end = 48.dp)
+                            )
+                        }
                     }
                 }
             }
