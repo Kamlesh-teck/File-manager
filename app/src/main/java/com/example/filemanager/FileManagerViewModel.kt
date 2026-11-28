@@ -1,5 +1,6 @@
 package com.example.filemanager
 
+import android.os.Build
 import android.os.Environment
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -7,9 +8,15 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
 
 enum class SortBy { NAME, SIZE, DATE, TYPE }
 
@@ -48,10 +55,52 @@ fun matchesFilter(f: File, flt: FileFilter): Boolean {
     }
 }
 
+/**
+ * Folder ki ek entry. Folder hai ya file, size aur date ek hi baar (background me) padhe jate hain,
+ * taaki sort, filter aur screen banate waqt storage ko baar-baar chhuna na pade.
+ */
+class FileItem(val file: File, val isDir: Boolean, val size: Long, val modified: Long) {
+    val name: String = file.name
+    val path: String = file.absolutePath
+    val lower: String = name.lowercase()
+    val ext: String = name.substringAfterLast('.', "").lowercase()
+}
+
+fun matchesFilter(f: FileItem, flt: FileFilter): Boolean {
+    if (flt == FileFilter.ALL) return true
+    if (flt == FileFilter.FOLDERS) return f.isDir
+    if (f.isDir) return true
+    val e = f.ext
+    return when (flt) {
+        FileFilter.IMAGES -> e in F_IMAGES
+        FileFilter.VIDEOS -> e in F_VIDEOS
+        FileFilter.AUDIO -> e in F_AUDIO
+        FileFilter.DOCS -> e in F_DOCS
+        FileFilter.ARCHIVES -> e in F_ARCHIVES
+        FileFilter.APK -> e == "apk"
+        FileFilter.CODE -> e in F_CODE
+        else -> true
+    }
+}
+
+private fun statItem(f: File): FileItem {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        try {
+            // ek hi call me isDirectory, size aur date teeno mil jate hain
+            val a = Files.readAttributes(f.toPath(), BasicFileAttributes::class.java)
+            return FileItem(f, a.isDirectory, if (a.isDirectory) 0L else a.size(), a.lastModifiedTime().toMillis())
+        } catch (e: Exception) {
+        }
+    }
+    val d = f.isDirectory
+    return FileItem(f, d, if (d) 0L else f.length(), f.lastModified())
+}
+
 data class PaneState(
     val path: File,
-    val files: List<File> = emptyList(),   // screen par dikhne wali (filter + sort ke baad)
-    val all: List<File> = emptyList(),     // folder ki poori list
+    val files: List<FileItem> = emptyList(),   // screen par dikhne wali (filter + sort ke baad)
+    val all: List<FileItem> = emptyList(),     // folder ki poori list
+    val loading: Boolean = false,
     val selected: Set<String> = emptySet(),
     val showHidden: Boolean = true,
     val sortBy: SortBy = SortBy.NAME,
@@ -88,19 +137,23 @@ class FileManagerViewModel : ViewModel() {
         if (isLeft) left = s else right = s
     }
 
-    private fun visible(s: PaneState): List<File> {
+    private fun visible(s: PaneState): List<FileItem> {
         val q = s.query.trim().lowercase()
-        val cmp: Comparator<File> = when (s.sortBy) {
-            SortBy.NAME -> compareBy<File> { it.name.lowercase() }
-            SortBy.SIZE -> compareBy<File> { if (it.isFile) it.length() else 0L }
-            SortBy.DATE -> compareBy<File> { it.lastModified() }
-            SortBy.TYPE -> compareBy<File>({ it.extension.lowercase() }, { it.name.lowercase() })
+        val cmp: Comparator<FileItem> = when (s.sortBy) {
+            SortBy.NAME -> compareBy<FileItem> { it.lower }
+            SortBy.SIZE -> compareBy<FileItem> { it.size }
+            SortBy.DATE -> compareBy<FileItem> { it.modified }
+            SortBy.TYPE -> compareBy<FileItem>({ it.ext }, { it.lower })
         }
         val ordered = if (s.ascending) cmp else cmp.reversed()
+        val finalOrder = if (Prefs.foldersFirst) compareBy<FileItem> { !it.isDir }.then(ordered) else ordered
         return s.all
-            .filter { (s.showHidden || !it.name.startsWith(".")) && (q.isEmpty() || it.name.lowercase().contains(q)) }
-            .filter { matchesFilter(it, s.filter) }
-            .sortedWith(if (Prefs.foldersFirst) compareBy<File> { !it.isDirectory }.then(ordered) else ordered)
+            .filter {
+                (s.showHidden || !it.name.startsWith(".")) &&
+                        (q.isEmpty() || it.lower.contains(q)) &&
+                        matchesFilter(it, s.filter)
+            }
+            .sortedWith(finalOrder)
     }
 
     private fun refilter(isLeft: Boolean, change: (PaneState) -> PaneState) {
@@ -120,24 +173,51 @@ class FileManagerViewModel : ViewModel() {
         }
     }
 
-    fun load(isLeft: Boolean, dir: File, history: Boolean = true) = viewModelScope.launch {
-        val cur = pane(isLeft)
-        val raw = withContext(Dispatchers.IO) {
-            dir.listFiles()
-                // /storage/emulated list nahi hota, isliye uske andar "0" khud dikhate hain
-                ?: if (dir.path == "/storage/emulated") arrayOf(File("/storage/emulated/0")) else null
+    private var leftJob: Job? = null
+    private var rightJob: Job? = null
+
+    /** Folder ki entries parallel me padhta hai (badi list ke liye tez) */
+    private suspend fun readItems(dir: File): List<FileItem>? {
+        // /storage/emulated list nahi hota, isliye uske andar "0" khud dikhate hain
+        val raw: Array<File> = dir.listFiles()
+            ?: if (dir.path == "/storage/emulated") arrayOf(File("/storage/emulated/0")) else return null
+        if (raw.size <= 300) return raw.map { statItem(it) }
+        return coroutineScope {
+            raw.toList().chunked(250)
+                .map { part -> async(Dispatchers.IO) { part.map { statItem(it) } } }
+                .awaitAll()
+                .flatten()
         }
-        if (raw == null) message = "Is folder ka content padh nahi sakte (upar ja sakte ho)"
+    }
+
+    fun load(isLeft: Boolean, dir: File, history: Boolean = true): Job {
+        // pichla load chal raha ho to rok do, taaki purana natija naye ko na bigade
+        if (isLeft) leftJob?.cancel() else rightJob?.cancel()
+
+        val cur = pane(isLeft)
         val same = dir.absolutePath == cur.path.absolutePath
-        val base = cur.copy(
-            path = dir,
-            all = raw?.toList() ?: emptyList(),
-            selected = emptySet(),
-            query = if (same) cur.query else "",
-            back = if (history && !same) (cur.back + cur.path).takeLast(50) else cur.back,
-            forward = if (history && !same) emptyList() else cur.forward
+        val back = if (history && !same) (cur.back + cur.path).takeLast(50) else cur.back
+        val forward = if (history && !same) emptyList() else cur.forward
+        // naye folder par turant khaali list aur loading dikhao; wahi folder ho to purani list rehne do
+        update(
+            isLeft,
+            if (same) cur.copy(loading = true)
+            else cur.copy(
+                path = dir, all = emptyList(), files = emptyList(), selected = emptySet(),
+                query = "", back = back, forward = forward, loading = true
+            )
         )
-        update(isLeft, base.copy(files = visible(base)))
+
+        val job = viewModelScope.launch {
+            val items = withContext(Dispatchers.IO) { readItems(dir) }
+            if (items == null) message = "Is folder ka content padh nahi sakte (upar ja sakte ho)"
+            val base = pane(isLeft).copy(all = items ?: emptyList(), selected = emptySet(), loading = false)
+            // sort aur filter bhi UI thread se alag
+            val shown = withContext(Dispatchers.Default) { visible(base) }
+            update(isLeft, base.copy(files = shown))
+        }
+        if (isLeft) leftJob = job else rightJob = job
+        return job
     }
 
     fun open(isLeft: Boolean, f: File) {
@@ -171,7 +251,7 @@ class FileManagerViewModel : ViewModel() {
         update(isLeft, cur.copy(selected = s))
     }
 
-    fun selectAll() = update(activeLeft, active.copy(selected = active.files.map { it.absolutePath }.toSet()))
+    fun selectAll() = update(activeLeft, active.copy(selected = active.files.map { it.path }.toSet()))
     fun clearSelection() = update(activeLeft, active.copy(selected = emptySet()))
 
     fun toggleHidden() = refilter(activeLeft) { it.copy(showHidden = !it.showHidden) }
