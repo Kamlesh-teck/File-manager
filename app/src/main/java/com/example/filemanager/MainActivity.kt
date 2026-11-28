@@ -845,6 +845,9 @@ fun DrawerContent(onPick: (File) -> Unit, onTerminal: () -> Unit, onTheme: () ->
             DrawerItem(Icons.Default.Apps, "Installed Apps", true) {
                 context.startActivity(Intent(context, AppsActivity::class.java))
             }
+            DrawerItem(Icons.Default.Wifi, "Remote Manager (FTP)", true) {
+                context.startActivity(Intent(context, RemoteActivity::class.java))
+            }
         }
     }
 }
