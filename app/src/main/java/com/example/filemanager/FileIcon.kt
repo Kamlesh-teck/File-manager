@@ -38,14 +38,16 @@ private val ARCHIVE_TYPES = setOf("zip", "rar", "7z", "tar", "gz", "jar", "xz", 
 
 /** MT Manager jaisa rang-birangi rounded icon: file ke type ke hisab se rang aur nishan */
 @Composable
-fun FileIcon(file: File, size: Dp = 28.dp) {
+fun FileIcon(file: File, size: Dp = 28.dp, isDir: Boolean? = null) {
     val dark = LocalDark.current
     val folderColor =
         if (dark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
 
     val ext = file.extension.lowercase()
+    // isDir pata ho to batao, warna har baar storage se poochna padta hai
+    val isFolder = isDir ?: file.isDirectory
     val (icon, color) = when {
-        file.isDirectory -> Icons.Default.Folder to folderColor
+        isFolder -> Icons.Default.Folder to folderColor
         ext == "pdf" -> Icons.Default.PictureAsPdf to Color(0xFFD32F2F)
         ext == "apk" -> Icons.Default.Android to Color(0xFF2E7D32)
         ext in ARCHIVE_TYPES -> Icons.Default.Archive to Color(0xFF795548)
