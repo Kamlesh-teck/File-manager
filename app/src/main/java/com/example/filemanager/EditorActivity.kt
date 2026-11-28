@@ -50,7 +50,12 @@ class EditorActivity : ComponentActivity() {
         if (path == null) { finish(); return }
         setContent {
             AppTheme {
-                EditorScreen(File(path), onClose = { finish() })
+                EditorScreen(
+                    File(path),
+                    startLine = intent.getIntExtra("line", 0),
+                    startFind = intent.getStringExtra("find") ?: "",
+                    onClose = { finish() }
+                )
             }
         }
     }
@@ -58,13 +63,14 @@ class EditorActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EditorScreen(file: File, onClose: () -> Unit) {
+fun EditorScreen(file: File, startLine: Int = 0, startFind: String = "", onClose: () -> Unit) {
     var tfv by remember { mutableStateOf(TextFieldValue("")) }
     var original by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>("Khul raha hai...") }
     var loaded by remember { mutableStateOf(false) }
-    var showSearch by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
+    var showSearch by remember { mutableStateOf(startFind.isNotEmpty()) }
+    var query by remember { mutableStateOf(startFind) }
+    var pendingJump by remember { mutableIntStateOf(startLine) }
     var replacement by remember { mutableStateOf("") }
     var confirmExit by remember { mutableStateOf(false) }
 
@@ -89,8 +95,20 @@ fun EditorScreen(file: File, onClose: () -> Unit) {
             }
         }
         result.onSuccess {
-            original = it; tfv = TextFieldValue(it); loaded = true; status = null
+            original = it; loaded = true; status = null
+            tfv = TextFieldValue(it, TextRange(lineStartOffset(it, startLine)))
         }.onFailure { status = it.message ?: "File khul nahi payi" }
+    }
+
+    // Search se kisi line par kholne par wahan tak scroll karo
+    LaunchedEffect(layout, loaded) {
+        val l = layout
+        if (pendingJump > 0 && loaded && l != null && l.layoutInput.text.length == tfv.text.length) {
+            val off = tfv.selection.start.coerceIn(0, l.layoutInput.text.length)
+            val y = l.getLineTop(l.getLineForOffset(off))
+            vScroll.scrollTo(maxOf(0, (y - 120f).toInt()))
+            pendingJump = 0
+        }
     }
 
     fun save(thenExit: Boolean = false) {
@@ -358,4 +376,19 @@ fun highlight(src: String, ext: String): AnnotatedString = buildAnnotatedString 
             paint(XML_COMMENT, C_COMMENT)
         }
     }
+}
+
+
+/** text me line number `line` (1 se shuru) kahan se shuru hoti hai */
+private fun lineStartOffset(text: String, line: Int): Int {
+    if (line <= 1) return 0
+    var idx = 0
+    var n = 1
+    while (n < line) {
+        val nl = text.indexOf('\n', idx)
+        if (nl < 0) return idx
+        idx = nl + 1
+        n++
+    }
+    return idx
 }
