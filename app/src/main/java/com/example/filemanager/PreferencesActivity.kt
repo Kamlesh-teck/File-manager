@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -108,6 +109,19 @@ fun PreferencesScreen(onClose: () -> Unit) {
             }
             PrefRow("Theme / Colors", "Rang aur dark mode") { dialog = "theme" }
 
+            SectionTitle("Editor")
+            PrefRow("Font size", "${Prefs.editorSize} sp") { dialog = "efont" }
+            SwitchRow(
+                "Word wrap", "Lambi lines screen ki width me tut jayen (tab line numbers nahi dikhte)",
+                Prefs.editorWrap
+            ) { Prefs.editorWrap = it; changed() }
+            SwitchRow(
+                "Line numbers", "Word wrap band ho tab dikhte hain", Prefs.editorLineNumbers
+            ) { Prefs.editorLineNumbers = it; changed() }
+            SwitchRow(
+                "Syntax colors", "Code ke keywords, strings, comments rangin", Prefs.editorHighlight
+            ) { Prefs.editorHighlight = it; changed() }
+
             SectionTitle("Other")
             PrefRow("Reset preferences", "Upar ki sab settings default par") { dialog = "reset" }
 
@@ -141,6 +155,24 @@ fun PreferencesScreen(onClose: () -> Unit) {
                         ) {
                             RadioButton(selected = Prefs.textSize == i, onClick = { Prefs.textSize = i; changed() })
                             Text(name)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton({ dialog = null }) { Text("OK") } }
+        )
+        "efont" -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text("Editor font size") },
+            text = {
+                Column {
+                    listOf(11, 13, 14, 16, 18, 20, 24).forEach { sz ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { Prefs.editorSize = sz; changed() },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = Prefs.editorSize == sz, onClick = { Prefs.editorSize = sz; changed() })
+                            Text("$sz sp   val x = 42", fontSize = sz.sp, fontFamily = FontFamily.Monospace)
                         }
                     }
                 }
